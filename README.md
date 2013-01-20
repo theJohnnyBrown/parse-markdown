@@ -1,13 +1,11 @@
 # parse-markdown
 
-A Clojure library designed to ... well, that part is up to you.
-
-## Usage
-
-FIXME
+A Clojure library designed to parse markdown text files into clojure data structures.
 
 ## License
 
-Copyright © 2013 FIXME
+This software is released under the GNU General Public License V3
 
-Distributed under the Eclipse Public License, the same as Clojure.
+http://www.gnu.org/licenses/gpl.html
+
+Copyright © 2013 Jonathan Brown
