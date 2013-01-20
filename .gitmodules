@@ -1,0 +1,3 @@
+[submodule "src/checkouts/amotoen"]
+	path = src/checkouts/amotoen
+	url = git@github.com:theJohnnyBrown/amotoen.git
