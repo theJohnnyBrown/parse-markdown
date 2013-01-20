@@ -1,5 +1,6 @@
 (ns parse-markdown.core
-  (:require [com.lithinos.amotoen.core :as am]))
+  (:require [com.lithinos.amotoen.core :as am]
+            [clojure.string :as string]))
 
 
 ;; markdown grammar
@@ -10,20 +11,21 @@
 (defmacro am-str [s]
   `(list ~'(symbol "f") custom-collapse (am/pegs ~s)))
 (def headings (map #(am-str (apply str (repeat % "#"))) (range 6 0 -1)))
+(def blocks '(:BlockQuote
+              :Verbatim
+              :Reference
+              :HorizontalRule
+              :Heading
+              :OrderedList
+              :BulletList
+                                        ;:HtmlBlock
+                                        ;:StyleBlock
+              :Para
+              :Plain))
 (def markdown-grammar
   {
    :Doc ['(| :BOM []) :Block '(* :Block)]
-   :Block ['(* :Blankline) '(| :BlockQuote
-                               :Verbatim
-                               :Reference
-                               :HorizontalRule
-                               :Heading
-                               :OrderedList
-                               :BulletList
-                               ;:HtmlBlock
-                               ;:StyleBlock
-                               :Para
-                               :Plain)]
+   :Block ['(* :Blankline) (apply list (list* '| blocks))]
    :Para      [:NonindentSpace :Inlines :Blankline '(* :Blankline)]
    :Plain [:Inlines]
 
@@ -59,11 +61,11 @@
                     '(| [\_ :Sp \_ :Sp \_ (* [:Sp \_])])]
 
    :Bullet ['(! :HorizontalRule)
-            :NonindentSpace '(| \+ \* \*) :Spacechar '(* :Spacechar)]
+            :NonindentSpace '(| \+ \* \-) :Spacechar '(* :Spacechar)]
    :BulletList ['(& :Bullet) '(| :ListTight :ListLoose)]
    :ListTight [:ListItemTight '(* :ListItemTight) '(* :Blankline)
                '(! :Bullet :Enumerator)]
-   :ListLoose [[:ListItem '(* :Blankline)] '(* [:ListItem '(* :Blankline)])]
+   :ListLoose [[:ListItem '(* :Blankline)] '(* [:ListItem (* :Blankline)])]
    :ListItem ['(| :Bullet :Enumerator) :ListBlock '(* :ListContinuationBlock)]
    :ListItemTight ['(| :Bullet :Enumerator)
                    :ListBlock '(* [(! :Blankline) :ListContinuationBlock])
@@ -76,7 +78,7 @@
    :Digit '(| \0 \1 \2 \3 \4 \5 \6 \7 \8 \9 )
    :OrderedList ['(& :Enumerator) '(| :ListTight :ListLoose)]
    :ListBlockLine ['(! :Blankline)
-                   '(! [:Indent (| :Bullet :Enumerator)])
+                   '(! [(| :Indent []) (| :Bullet :Enumerator)])
                    '(! :HorizontalRule)
                    :OptionallyIndentedLine]
 
@@ -211,6 +213,10 @@
 
 (type (:HexDigit markdown-grammar))
 ;; Use example
+(empty? 1)
+(defn null? [a]
+  (or (nil? a) (= a "") (= a []) (= a ())))
+
 (defn str-str [a]
   (cond
    (string? a) a
@@ -220,35 +226,72 @@
 
 (defn wrap-tag [tag]
   (fn [a]
-    (if-not (or (nil? a) (= a ""))
-      {:tag tag :content (str-str a)}
+    (if-not (null? a)
+      {:tag tag :content (string/trim (str-str a))}
       a)))
 
 (defn atx-heading [a]
-  (if-not (or (nil? a) (= a ""))
+  (if-not (null? a)
     (let [start (a 0) content (a 2)]
       {:tag (symbol (str "h" (.length (str-str start))))
-       :content (str-str content)})
+       :content (string/trim (string/replace (str-str content) "#" ""))})
       a))
 
-(defn setext-heading [a]
-  (if-not (or (nil? a) (= a ""))
-    (let [start (a 0) content (a 2)]
-      {:tag (symbol (str "h" (.length (str-str start))))
-       :content (str-str content)})
-      a))
+(defn nothing [a]
+  (if-not (null? a) "" a))
 
-(pprint "------")
-(am/pegasus :RawLine markdown-grammar
-            (am/wrap-string "wedfgdsfvd\n--------\nakjdhf"))
-(pprint (am/post-process :Doc markdown-grammar
-             (am/wrap-string "sdf'f4@9rd\n\nheader\n-------\n\npara?")
-             {:Plain (wrap-tag :p)
+(defn list-loose [a]
+  (if-not (null? a)
+  (apply vector (cons (:ListItem ((a 0) 0))
+                      (map #(:ListItem (% 0)) (a 1))))
+  a))
+
+(defn bullet-list [a]
+  (if-not (null? a)
+    {:tag :ul
+      :content(or (:ListLoose (a 1)) (:ListTight) (a 1))}
+    a))
+
+(defn block [a]
+  (if-not (null? a)
+    (reduce (fn [acc item] (or acc (item (a 1)))) false blocks)
+    a))
+
+(defn heading [a]
+  (if-not (null? a)
+    (or (:AtxHeading a) (:SetextHeading a))
+    a))
+
+(pprint (am/post-process  :Doc markdown-grammar
+             (am/wrap-string (slurp "test/parse_markdown/basics.md"))
+             {:Doc #(apply vector (cons (:Block (% 1)) (map :Block (% 2))))
+              :Block block
+              :Plain (wrap-tag :p)
               :Para (wrap-tag :p)
+              :Heading heading
+              :ListItem (wrap-tag :li)
+              :ListLoose list-loose
+              :BulletList bullet-list
+              :Bullet nothing
               :AtxHeading atx-heading
               }))
 
-([1 2] 1)
-(if (= (.length "23") 1))
-(vector? s)
-(str-str s)
+;; Experimental
+
+(def a [()
+    {:BulletList
+     [{:tag :li, :content "asjlkdhfe sdkljhf"}
+      {:tag :li, :content "lsakjdf fjksdl"}
+      {:tag :li, :content "dkdkdkdkd"}]}])
+(block a)
+(map #(:ListItem (% 0)) (a 1))
+
+(pprint "------")
+(def pred {:a [\b '(& \a)]})
+(am/pegasus :a pred (am/wrap-string "ba"))
+
+(am/pegasus :Bb
+            {:Bb '(& \space)}
+            (am/wrap-string " + item\n + another item"))
+
+(apply vector '(1 2 3))
