@@ -389,8 +389,8 @@ n(def blocks '(:BlockQuote
     {:tag :p :content (:Inlines (a 1))}
     a))
 
-(pprint (am/post-process  :Doc markdown-grammar
-             (am/wrap-string (str (slurp "test/parse_markdown/basics.md")))
+(defn str-to-clj [markdown-string] (am/post-process  :Doc markdown-grammar
+             (am/wrap-string markdown-string)
              {:Doc process-doc
               :Link link
               :ExplicitLink explicit-link
@@ -418,4 +418,5 @@ n(def blocks '(:BlockQuote
               :Para para
               }))
 
-;; Experimental
+(defn to-clj [markdown-file]
+  (str-to-clj (slurp markdown-file)))
