@@ -138,7 +138,7 @@
    :ExplicitLink [:Label \( :Sp :Source :Spnl :Title :Sp \) ]
    :Source '(| [\< :SourceContents \>] :SourceContents)
    :SourceContents '(| [:ScIn (* :ScIn)] [\( :SourceContents \) ])
-   :ScIn ['(! \( \) \>) :NonspaceChar]
+   :ScIn ['(! (| \( \) \>)) :NonspaceChar]
 
    :Title '(| :TitleSingle :TitleDouble [])
    :TitleSingle [\' '(*  [(! \' :Sp (| \) :Newline))  :.] ) \']
@@ -266,9 +266,9 @@
              (am/wrap-string (slurp "test/parse_markdown/basics.md"))
              {:Doc #(apply vector (cons (:Block (% 1)) (map :Block (% 2))))
               :Block block
-              :Plain (wrap-tag :p)
-              :Para (wrap-tag :p)
+              :Str str-str
               :Heading heading
+              :SourceContents str-str
               :ListItem (wrap-tag :li)
               :ListLoose list-loose
               :BulletList bullet-list
@@ -290,8 +290,11 @@
 (def pred {:a [\b '(& \a)]})
 (am/pegasus :a pred (am/wrap-string "ba"))
 
-(am/pegasus :Bb
-            {:Bb '(& \space)}
-            (am/wrap-string " + item\n + another item"))
+(am/pegasus :Link
+            markdown-grammar
+            (am/wrap-string "[markdown specification](http://daringfireball.net/projects/markdown/syntax#list)\n"))
+(am/pegasus :ScIn
+            markdown-grammar
+            (am/wrap-string ")"))
 
 (apply vector '(1 2 3))
