@@ -219,9 +219,9 @@
    :Sp? '(| :Sp [])
    :BOM [(list 'f custom-collapse (am/pegs "\357\273\277"))]})
 
-(type (:HexDigit markdown-grammar))
+
 ;; Use example
-(empty? 1)
+
 (defn null? [a]
   (or (nil? a) (= a "") (= a []) (= a ()) (false? a)))
 
