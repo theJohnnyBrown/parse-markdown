@@ -1,3 +1,4 @@
+
 (ns parse-markdown.core
   (:require [com.lithinos.amotoen.core :as am]
             [clojure.string :as string]))
@@ -302,10 +303,6 @@ n(def blocks '(:BlockQuote
                         (map get-inline more-elements))))))
     a))
 
-(defn link [a]
-  (if-not (null? a)
-    (or-key a :ExplicitLink :ReferenceLink :AutoLink)
-    a))
 
 (defn process-doc [a]
   (if-not (null? a)
@@ -335,8 +332,16 @@ n(def blocks '(:BlockQuote
                  (:Label cont)
                  (apply vector (:Label cont))))}
     a))
+
 (defn- or-key [dict & keys]
   (reduce (fn [acc item] (or acc item)) false (map #(% dict) keys)))
+
+
+(defn link [a]
+  (if-not (null? a)
+    (or-key a :ExplicitLink :ReferenceLink :AutoLink)
+    a))
+
 (defn emph [a]
   (if-not (null? a)
     (let [elems (or (:EmphUl a) (:EmphStar a))]
