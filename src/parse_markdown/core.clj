@@ -12,7 +12,7 @@
 (defmacro am-str [s]
   `(list ~'(symbol "f") custom-collapse (am/pegs ~s)))
 (def headings (map #(am-str (apply str (repeat % "#"))) (range 6 0 -1)))
-n(def blocks '(:BlockQuote
+(def blocks '(:BlockQuote
               :Verbatim
               :Reference
               :HorizontalRule
