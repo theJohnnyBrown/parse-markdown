@@ -394,11 +394,23 @@
     {:tag :p :content (:Inlines (a 1))}
     a))
 
+(defn image [a]
+  (if-not (null? a)
+  (let [link (or-key (a 1) :ExplicitLink :ReferenceLink)
+        alt (apply str (:content link))]
+    {:tag :img
+     :attrs
+     {:src (:href (:attrs link))
+      :alt alt
+      :title alt}})
+  a))
+
 (defn str-to-clj [markdown-string] (am/post-process  :Doc markdown-grammar
              (am/wrap-string markdown-string)
              {:Doc process-doc
               :Link link
               :ExplicitLink explicit-link
+              :Image image
               :Source process-source
               :SourceContents str-str
               :Emph emph
