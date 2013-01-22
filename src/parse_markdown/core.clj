@@ -423,6 +423,7 @@
               :Para para
               :Endline str-str
               :Newline str-str
+              :Symbol str-str
               }))
 
 (defn to-clj [markdown-file]
