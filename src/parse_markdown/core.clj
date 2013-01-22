@@ -310,7 +310,7 @@
            (cons (:Block (a 1))
                  (if (seq? (a 2))
                    (map :Block (a 2))
-                   (:Block (a 2)))))
+                   (list (:Block (a 2))))))
     a))
 
 (defn process-source [a]
@@ -421,6 +421,8 @@
               :AtxHeading atx-heading
               :Plain plain
               :Para para
+              :Endline str-str
+              :Newline str-str
               }))
 
 (defn to-clj [markdown-file]
