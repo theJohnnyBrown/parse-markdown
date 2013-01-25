@@ -6,6 +6,8 @@
 
 
 
+(def custom-collapse #(if % (apply str %) %))
+
 (defmacro am-str [s]
   `(list ~'(symbol "f") custom-collapse (am/pegs ~s)))
 
@@ -18,8 +20,6 @@
    (char? a)   (str a)
    (map? a)    (apply str (map str-str (vals a)))
    (or (vector? a) (seq? a))    (apply str (map str-str a))))
-
-(def custom-collapse #(if % (apply str %) %))
 
 (defn parse-html-string [s]
   (let [parsed (with-in-str s (html/html-resource *in*))]
