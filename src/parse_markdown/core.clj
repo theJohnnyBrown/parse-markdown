@@ -1,17 +1,86 @@
 
 (ns parse-markdown.core
   (:require [com.lithinos.amotoen.core :as am]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [net.cgrand.enlive-html :as html]))
 
+
+
+(defmacro am-str [s]
+  `(list ~'(symbol "f") custom-collapse (am/pegs ~s)))
+
+(defn html-close-tag [tag]
+  [\< \/ :Sp? (am-str tag) :Sp \>])
+
+(defn str-str [a]
+  (cond
+   (string? a) a
+   (char? a)   (str a)
+   (map? a)    (apply str (map str-str (vals a)))
+   (or (vector? a) (seq? a))    (apply str (map str-str a))))
+
+(def custom-collapse #(if % (apply str %) %))
+
+(defn parse-html-string [s]
+  (let [parsed (with-in-str s (html/html-resource *in*))]
+    (-> parsed ;; this madness because html-resource auto adds html and body
+        first
+        :content
+        first
+        :content
+        first)))
+
+(defn parse-html-block [g w]
+;  (pprint (am/pegasus :HTMLOpen g w))
+  (if-let [openblock (:HTMLOpen (am/pegasus :HTMLOpen g w))]
+    (let [tagname (str-str (openblock 2))
+          closetag (html-close-tag tagname)
+          rest (am/pegasus [(list '* (list '% closetag)) closetag] g w)]
+      (str-str (list openblock rest)))
+    nil))
+
+(def html-spans #{"abbr"
+                  "dfn"
+                  "em"
+                  "strong"
+                  "code"
+                  "samp"
+                  "kbd"
+                  "var"
+                  "b"
+                  "i"
+                  "u"
+                  "small"
+                  "s"
+                  "big"
+                  "strike"
+                  "tt"
+                  "font"
+                  "span"
+                  "bdo"
+                  "cite"
+                  "del"
+                  "ins"
+                  "q"
+                  "sub"
+                  "sup"})
+
+(defn parse-html-span [g w]
+  (if-let [openblock (:HTMLOpen (am/pegasus :HTMLOpen g w))]
+    (if-let [tagname (html-spans (str-str (openblock 2)))]
+      (let [closetag (html-close-tag tagname)
+            rest (am/pegasus [(list '* (list '% closetag)) closetag] g w)]
+        (str-str (list openblock rest)))
+      nil)
+    nil))
+
+
+(def headings (map #(am-str (apply str (repeat % "#"))) (range 6 0 -1)))
 
 ;; markdown grammar
 ;; © 2008 John MacFarlane (jgm at berkeley dot edu).
 ;; GPL?
 
-(def custom-collapse #(if % (apply str %) %))
-(defmacro am-str [s]
-  `(list ~'(symbol "f") custom-collapse (am/pegs ~s)))
-(def headings (map #(am-str (apply str (repeat % "#"))) (range 6 0 -1)))
 (def blocks '(:BlockQuote
               :Verbatim
               :Reference
@@ -19,12 +88,12 @@
               :Heading
               :OrderedList
               :BulletList
-                                        ;:HtmlBlock
+              :HTMLBlock
                                         ;:StyleBlock
               :Para
               :Plain))
 (def inlines '(:Str :Endline :UlOrStarLine :Space :Strong :Emph :Image :Link
-               :Code :Entity :EscapedChar
+               :Code :HTMLInline :Entity :EscapedChar
                :Symbol))
 (def markdown-grammar
   {
@@ -177,7 +246,19 @@
                [(! :Ticks3) \` (* \`)]
                [(! [:Sp :Ticks3]) (| :Spacechar [:Newline (! :Blankline)])])
    ;; TODO RawHtml
+   :HTMLInline (list '| :HTMLBlockSelfClosing :HTMLSpanLevel)
+   :HTMLSpanLevel (list 'a parse-html-span)
+   :HTMLBlock (list '| :HTMLBlockSelfClosing :HTMLBlockInTags)
+   :HTMLBlockInTags (list 'a parse-html-block)
+   :HTMLBlockSelfClosing [\< :Sp? :Str :Sp? '(* :HTMLAttr) \/ \>]
+   :HTMLOpen [ \< :Sp? :Str :Sp '(* :HTMLAttr ) \>]
+   :HTMLClose [\< \/ :Sp? :Str :Sp \>]
+   :HTMLAttr ['(| :AlphanumericAscii \-) '(* (| :AlphanumericAscii \-))
+              :Sp
+              '(| [\= :Sp (| :Quoted :_HTMLAttrVal)] []) :Spnl]
+   :_HTMLAttrVal [['(! \>) :NonspaceChar] '(* ['(! \>) :NonspaceChar])]
 
+   ;; end my html
    :Blankline [:Sp :Newline]
    :Quoted '(| [\" (* (% \")) \"] [\' (* (% \')) \'])
    :HtmlAttribute ['(| :AlphanumericAscii \-) '(* (| :AlphanumericAscii \-)) :Spnl '(| [\= :Spnl (| :Quoted [[(! \>) :NonspaceChar] (* [(! \>) :NonspaceChar])] )] []) :Spnl]
@@ -211,7 +292,7 @@
                    (* [(% (| \# :SetextBottom1 :SetextBottom2 :Blankline))
                        :RawLine])
                    :Blankline (* :Blankline)]
-                  [:Blankline (* :Blanline)]
+                  [:Blankline (* :Blankline)]
                   :RawLine) ; TODO HtmlBlock
 
    :EmailChar (list '| :Alphabetical (am/lpegs '| "0123456789+_./!%~$"))
@@ -225,12 +306,7 @@
 (defn null? [a]
   (or (nil? a) (= a "") (= a []) (= a ()) (false? a)))
 
-(defn str-str [a]
-  (cond
-   (string? a) a
-   (char? a)   (str a)
-   (map? a)    (apply str (map str-str (vals a)))
-   (or (vector? a) (seq? a))    (apply str (map str-str a))))
+
 (defn str-strip [a strip]
   (if-not (null? a)
     ()))
@@ -405,6 +481,12 @@
       :title alt}})
   a))
 
+(defn html-types [& keys]
+  (fn [elem]
+    (if-not (null? elem)
+      (parse-html-string (apply (partial or-key elem) keys))
+      elem)))
+
 (defn str-to-clj [markdown-string] (am/post-process  :Doc markdown-grammar
              (am/wrap-string markdown-string)
              {:Doc process-doc
@@ -433,6 +515,9 @@
               :AtxHeading atx-heading
               :Plain plain
               :Para para
+              :HTMLBlockSelfClosing str-str
+              :HTMLBlock (html-types :HTMLBlockSelfClosing :HTMLBlockInTags)
+              :HTMLInline (html-types :HTMLBlockSelfClosing :HTMLSpanLevel)
               :Endline str-str
               :Newline str-str
               :Symbol str-str
